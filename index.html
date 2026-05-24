@@ -138,20 +138,32 @@
 </div></div>
 <div class="card" style="text-align:center">
 <button class="btn btn-orange" onclick="submitToTeacher()" id="submitBtn" style="width:100%;font-size:16px;padding:14px">📤 Submit to Teacher</button>
+<div id="submitStatus" style="display:none;margin-top:16px;padding:16px;border-radius:12px;text-align:center"></div>
 <div class="submit-success" id="submitSuccess"><h3>✅ Submitted!</h3><p>Your homework has been sent to your teacher.</p></div>
 <p style="color:#888;font-size:12px;margin-top:8px">This will open a Google Form with your scores and writing feedback.</p>
 </div></div>
 </div>
 </div>
 
-<script>let submitted=false;
+<script>
+function setTeacher(sel){
+  var opt=sel.options[sel.selectedIndex];
+  var th=document.getElementById('teacherName');
+  if(th)th.value=opt?(opt.getAttribute('data-teacher')||''):'';
+}
 
+let submitted=false;
 const SESSION='Class 10';
 const SPEAKING_LIMIT=25; // Classes 9-12 = 25s
-let sn='',sClass='',sc={l:0,v:0,w:0,s:0,g:0};let writingText='',spokenTranscript='';
-const answers={lq1:'b',lq2:'c',lq3:'b',};let selectedQ={};
-const dialogue=[{s:'SA',t:'Good morning! How can I help you?',g:'f'},{s:'C',t:'I want to buy a shirt and pants for work.',g:'m'},{s:'SA',t:'What size do you need?',g:'f'},{s:'C',t:'Medium for the shirt and large for the pants.',g:'m'},{s:'SA',t:'Do you like this blue shirt?',g:'f'},{s:'C',t:'Yes, I like it. Can I try it on?',g:'m'},{s:'SA',t:'Of course!',g:'f'},{s:'C',t:'How much is it?',g:'m'},{s:'SA',t:'The shirt costs 30 dollars and the pants cost 45 dollars.',g:'f'},{s:'C',t:'I will take them. Thank you!',g:'m'},];
-const vocabPairs=[{w:'Try on',d:'Put clothes on to see if they fit'},{w:'Size',d:'Small, medium, or large'},{w:'Cost',d:'How much money you pay'},{w:'Shirt',d:'You wear this on the top of your body'},{w:'Pants',d:'You wear these on your legs'},{w:'Dress',d:'Women wear this — one piece'},];
+let sn='',sClass='',name='',sc={l:0,v:0,w:0,s:0,g:0};
+let writingText='',spokenTranscript='',spokenText='';
+const answers={lq1:'b',lq2:'c',lq3:'b'};
+let selectedQ={};
+let grammarSel={};
+const dialogue=[{s:'SA',t:'Good morning! How can I help you?',g:'f'},{s:'C',t:'I want to buy a shirt and pants for work.',g:'m'},{s:'SA',t:'What size do you need?',g:'f'},{s:'C',t:'Medium for the shirt and large for the pants.',g:'m'},{s:'SA',t:'Do you like this blue shirt?',g:'f'},{s:'C',t:'Yes, I like it. Can I try it on?',g:'m'},{s:'SA',t:'Of course!',g:'f'},{s:'C',t:'How much is it?',g:'m'},{s:'SA',t:'The shirt costs 30 dollars and the pants cost 45 dollars.',g:'f'},{s:'C',t:'I will take them. Thank you!',g:'m'}];
+const vocabPairs=[{w:'Try on',d:'Put clothes on to see if they fit'},{w:'Size',d:'Small, medium, or large'},{w:'Cost',d:'How much money you pay'},{w:'Shirt',d:'You wear this on the top of your body'},{w:'Pants',d:'You wear these on your legs'},{w:'Dress',d:'Women wear this — one piece'}];
+const grammarData=[{q:'_____ can I help you?',opts:['What','How','Where'],ans:1},{q:'I want _____ buy a dress.',opts:['for','to','at'],ans:1},{q:'Can I _____ it on?',opts:['try','trying','tried'],ans:0},{q:'The shirt _____ $30.',opts:['cost','costs','costing'],ans:1},{q:'What _____ do you need?',opts:['color','size','price'],ans:1},{q:'_____ much is the dress?',opts:['What','How','Where'],ans:1},{q:'Do you like _____ blue one?',opts:['a','an','the'],ans:2},{q:'I _____ take them.',opts:['will','am','do'],ans:0}];
+
 function goTo(id){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');window.scrollTo(0,0)}
 function startHomework(){
   name=document.getElementById('studentName').value.trim();
@@ -197,42 +209,29 @@ function initVocab(){const grid=document.getElementById('vocabGrid');grid.innerH
 function pickWord(el){if(el.classList.contains('matched'))return;document.querySelectorAll('.vocab-word').forEach(w=>w.classList.remove('selected'));el.classList.add('selected');selWord=el;tryMatch()}
 function pickDef(el){if(el.classList.contains('matched'))return;document.querySelectorAll('.vocab-def').forEach(d=>d.classList.remove('selected'));el.classList.add('selected');selDef=el;tryMatch()}
 function tryMatch(){if(!selWord||!selDef)return;const fb=document.getElementById('matchFeedback');fb.style.display='block';if(selWord.dataset.idx===selDef.dataset.idx){selWord.classList.add('matched','correct');selDef.classList.add('matched','correct');matched++;sc.v=matched;fb.textContent='✅ Correct!';fb.style.background='#e8f8f0';fb.style.color='#27ae60';document.getElementById('vocabScore').textContent=matched+'/'+vocabPairs.length+' matched';if(matched===vocabPairs.length)document.getElementById('vocabNext').disabled=false}else{fb.textContent='❌ Try again!';fb.style.background='#fde8e8';fb.style.color='#e74c3c'}selWord.classList.remove('selected');selDef.classList.remove('selected');selWord=null;selDef=null;setTimeout(()=>{fb.style.display='none'},1200)}
-initVocab();
 function countWords(){const t=document.getElementById('writingText').value.trim();document.getElementById('wc').textContent=t?t.split(/\s+/).filter(Boolean).length:0}
 let isRec=false,recTime=0,recTimer=null,recognition=null;
 let autoStopTimer=null;
-let spokenText='';
 const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-if(SpeechRecognition){
-  recognition=new SpeechRecognition();
-  recognition.continuous=false;recognition.interimResults=true;recognition.lang='en-US';
-  recognition.onerror=()=>{};
-}
 function isRealSpeech(text){
   const w=text.trim().split(/\s+/).filter(Boolean);
   if(w.length<2)return false;
   const realWords=['how','can','i','help','you','want','buy','would','like','size','try','on','much','is','costs','dollars','take','shirt','pants','dress','shoes','medium','large','small'];
   return w.filter(x=>realWords.includes(x.toLowerCase().replace(/[^a-z]/g,''))).length>=1;
 }
-function setTeacher(sel){
-  var opt=sel.options[sel.selectedIndex];
-  var th=document.getElementById('teacherName');
-  if(th)th.value=opt?(opt.getAttribute('data-teacher')||''):'';
-}
 function toggleRec(){if(!isRec) startRec(); else stopRec();}
 function startRec(){
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){alert('Speech recognition not supported. Please use Chrome or Safari.');return;}
+  if(!SpeechRecognition){alert('Speech recognition not supported. Please use Chrome or Safari.');return;}
   spokenText='';spokenTranscript='';
-  const box=document.getElementById('transcriptBox');
-  if(box){box.textContent='';box.style.display='none';}
   isRec=true;recTime=0;
-  const mb=document.getElementById('micBtn')||document.getElementById('recBtn');
+  const mb=document.getElementById('micBtn');
   if(mb)mb.classList.add('recording');
-  const rs=document.getElementById('recStatus')||document.getElementById('statusText');
+  const rs=document.getElementById('statusText');
   if(rs)rs.textContent='Recording... tap again to stop';
-  recTimer=setInterval(function(){recTime++;const t=document.getElementById('recTimer')||document.getElementById('timer');if(t)t.textContent=Math.floor(recTime/60)+':'+String(recTime%60).padStart(2,'0');},1000);
-  recognition=new SR();
+  const timer=document.getElementById('recTimer');
+  if(timer)timer.style.display='block';
+  recTimer=setInterval(function(){recTime++;if(timer)timer.textContent=Math.floor(recTime/60)+':'+String(recTime%60).padStart(2,'0');if(recTime>=SPEAKING_LIMIT){stopRec();}},1000);
+  recognition=new SpeechRecognition();
   recognition.continuous=true;recognition.interimResults=true;recognition.lang='en-US';
   recognition.onresult=function(e){
     let interim='';
@@ -244,13 +243,9 @@ function startRec(){
     spokenTranscript=(spokenText+' '+interim).trim();
     const t=document.getElementById('speakTranscriptText');if(t){t.textContent=spokenTranscript;}
     const b=document.getElementById('speakTranscriptBox');if(b){b.style.display='block';}
-    const b2=document.getElementById('transcriptBox');if(b2){b2.textContent=spokenTranscript;b2.style.display='block';}
   };
-  recognition.onerror=function(ev){
-    // ignore 'no-speech' / 'aborted' silently; keep whatever transcript we have
-  };
+  recognition.onerror=function(ev){};
   recognition.onend=function(){
-    // Only restart if the user is still recording AND we haven't been told to stop
     if(isRec){try{recognition.start();}catch(err){}}
   };
   try{recognition.start();}catch(e){}
@@ -258,13 +253,11 @@ function startRec(){
 function stopRec(){
   isRec=false;clearInterval(recTimer);
   if(recognition){try{recognition.stop();}catch(e){} recognition=null;}
-  const mb=document.getElementById('micBtn')||document.getElementById('recBtn');
+  const mb=document.getElementById('micBtn');
   if(mb)mb.classList.remove('recording');
-  const rs=document.getElementById('recStatus')||document.getElementById('statusText');
+  const rs=document.getElementById('statusText');
   if(rs)rs.textContent='Checking your speaking...';
-  const sn=document.getElementById('speakNext');if(sn)sn.disabled=false;
-  const sb=document.getElementById('sBtn');if(sb)sb.disabled=false;
-  // Give the recognizer a moment to deliver any final results, then score
+  const snBtn=document.getElementById('speakNext');if(snBtn)snBtn.disabled=false;
   setTimeout(scoreSpeaking, 700);
 }
 
@@ -325,6 +318,7 @@ function submitToTeacher(){
   const wt=(writingText||(document.getElementById('writingText')?document.getElementById('writingText').value:'')||'').trim();
   const stEl=document.getElementById('speakTranscriptText');
   const st=(spokenTranscript||spokenText||(stEl?stEl.textContent:'')||'').trim();
+  const teacher=document.getElementById('teacherName').value||'';
   const formData=new FormData();
   formData.append('entry.154629934',sn||name||'');
   formData.append('entry.771629595',document.getElementById('className')?document.getElementById('className').value:sClass);
@@ -337,7 +331,7 @@ function submitToTeacher(){
   formData.append('entry.543147037',pct+'%');
   formData.append('entry.301386877',wt||'');
   formData.append('entry.879060890',st||'No transcript captured');
-  formData.append('entry.1451249480','A1');
+  formData.append('entry.1451249480',teacher);
   const status=document.getElementById('submitStatus');
   fetch('https://docs.google.com/forms/d/e/1FAIpQLSfxgLZofrw5wLjtEaU9K0xgJWqztxigBXxpHCXe2Ndi3UOpnQ/formResponse',{method:'POST',mode:'no-cors',body:formData})
     .then(function(){
@@ -350,8 +344,6 @@ function submitToTeacher(){
       if(status){status.innerHTML='Submission failed. Check your internet and try again.';status.style.display='block';status.style.background='#fef2f2';}
     });
 }
-
-
 
 function checkWriting(){
   const t=document.getElementById('writingText').value.trim();
@@ -384,7 +376,7 @@ function checkWriting(){
   else msg+='<p>Keep practicing! Review the example above.</p>';
   fb.innerHTML=msg;fb.style.display='block';document.getElementById('writingNext').disabled=false;
 }
-const grammarData=[{q:'_____ can I help you?',opts:['What','How','Where'],ans:1},{q:'I want _____ buy a dress.',opts:['for','to','at'],ans:1},{q:'Can I _____ it on?',opts:['try','trying','tried'],ans:0},{q:'The shirt _____ $30.',opts:['cost','costs','costing'],ans:1},{q:'What _____ do you need?',opts:['color','size','price'],ans:1},{q:'_____ much is the dress?',opts:['What','How','Where'],ans:1},{q:'Do you like _____ blue one?',opts:['a','an','the'],ans:2},{q:'I _____ take them.',opts:['will','am','do'],ans:0},];let grammarSel={};
-initGrammar();
+
+document.addEventListener('DOMContentLoaded',function(){initVocab();initGrammar();});
 </script>
 </body></html>
